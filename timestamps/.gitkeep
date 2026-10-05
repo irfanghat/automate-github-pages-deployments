@@ -3,7 +3,8 @@ name: Write Timestamp
 on:
   workflow_dispatch:
   push:
-    - main
+    branches:
+      - main
 
 permissions:
   contents: write
