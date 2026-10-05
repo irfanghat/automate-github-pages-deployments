@@ -18,16 +18,16 @@ jobs:
         run: |
           timestamp=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
 
-          mkdir -p timestamps
+          mkdir -p reports
 
-          echo "$timestamp" > "timestamps/$timestamp.txt"
+          echo "$timestamp" > "reports/$timestamp.html"
 
       - name: Commit timestamp
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add timestamps/
+          git add reports/
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
