@@ -1,0 +1,142 @@
+name: Generate Report
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate report
+        run: |
+          timestamp=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+
+          echo "timestamp=$timestamp" >> "$GITHUB_ENV"
+
+          mkdir -p reports/history
+
+          cat > "reports/history/$timestamp.html" <<EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Report $timestamp</title>
+          </head>
+          <body>
+            <h2 style="
+              background: #242424;
+              color: #ffffff;
+              padding: 6px;
+              border-radius: 4px;
+              text-align: center;
+              font-family: monospace;
+              margin-top: 25%;
+              box-shadow: 0 3px 6px 0px rgba(0, 0, 0, .1);
+            ">
+              $timestamp
+            </h2>
+          </body>
+          </html>
+          EOF
+
+          cp "reports/history/$timestamp.html" reports/latest.html
+
+          cat > reports/index.html <<EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Reports</title>
+
+            <style>
+              body {
+                font-family: sans-serif;
+                max-width: 800px;
+                margin: 40px auto;
+                padding: 0 20px;
+              }
+
+              h1 {
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 10px;
+              }
+
+              a {
+                color: #0969da;
+                text-decoration: none;
+              }
+
+              a:hover {
+                text-decoration: underline;
+              }
+
+              .latest {
+                padding: 16px;
+                background: #f6f8fa;
+                border-radius: 6px;
+                margin-bottom: 30px;
+              }
+            </style>
+          </head>
+
+          <body>
+            <h1>Reports</h1>
+
+            <div class="latest">
+              <strong>Latest report</strong>
+
+              <p>
+                <a href="latest.html">
+                  $timestamp
+                </a>
+              </p>
+            </div>
+
+            <h2>History</h2>
+
+            <ul>
+              <li>
+                <a href="history/$timestamp.html">
+                  $timestamp
+                </a>
+              </li>
+            </ul>
+
+          </body>
+          </html>
+          EOF
+
+      - name: Commit reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add reports/
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Add report $timestamp"
+          git push
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
