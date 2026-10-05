@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate report
+      - name: Create report snapshot
         run: |
           timestamp=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
 
@@ -31,6 +31,7 @@ jobs:
             <meta charset="UTF-8">
             <title>Report $timestamp</title>
           </head>
+
           <body>
             <h2 style="
               background: #242424;
@@ -48,8 +49,34 @@ jobs:
           </html>
           EOF
 
-          cp "reports/history/$timestamp.html" reports/latest.html
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          git add reports/history/
+
+          git commit -m "Add report snapshot $timestamp"
+
+          git push
+
+      - name: Checkout committed snapshot
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Build latest report
+        run: |
+          latest=$(find reports/history -type f -name "*.html" | sort | tail -n 1)
+
+          echo "Latest committed report: $latest"
+
+          cp "$latest" reports/latest.html
+
+          echo "latest=$latest" >> "$GITHUB_ENV"
+
+      - name: Build dashboard
+        run: |
           cat > reports/index.html <<EOF
           <!DOCTYPE html>
           <html>
@@ -70,6 +97,13 @@ jobs:
                 padding-bottom: 10px;
               }
 
+              .latest {
+                padding: 16px;
+                background: #f6f8fa;
+                border-radius: 6px;
+                margin-bottom: 30px;
+              }
+
               a {
                 color: #0969da;
                 text-decoration: none;
@@ -78,17 +112,11 @@ jobs:
               a:hover {
                 text-decoration: underline;
               }
-
-              .latest {
-                padding: 16px;
-                background: #f6f8fa;
-                border-radius: 6px;
-                margin-bottom: 30px;
-              }
             </style>
           </head>
 
           <body>
+
             <h1>Reports</h1>
 
             <div class="latest">
@@ -96,7 +124,7 @@ jobs:
 
               <p>
                 <a href="latest.html">
-                  $timestamp
+                  $(basename "$latest" .html)
                 </a>
               </p>
             </div>
@@ -104,39 +132,32 @@ jobs:
             <h2>History</h2>
 
             <ul>
-              <li>
-                <a href="history/$timestamp.html">
-                  $timestamp
-                </a>
-              </li>
+          EOF
+
+          find reports/history -type f -name "*.html" \
+            | sort -r \
+            | while read report; do
+                name=$(basename "$report" .html)
+
+                echo "      <li>"
+                echo "        <a href=\"history/$name.html\">$name</a>"
+                echo "      </li>"
+              done >> reports/index.html
+
+          cat >> reports/index.html <<EOF
             </ul>
 
           </body>
           </html>
           EOF
 
-      - name: Commit reports
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add reports/
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git commit -m "Add report $timestamp"
-          git push
-
-      - name: Setup GitHub Pages
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: "."
+          path: "./reports"
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
